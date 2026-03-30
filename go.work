@@ -1,0 +1,14 @@
+go 1.25.3
+
+use (
+	./cmd/daemon
+	./pkg/config
+	./pkg/log
+	./pkg/silo
+	./pkg/store/sqlite
+	./pkg/adapter
+	./pkg/adapter/gmail
+	./pkg/adapter/nango
+	./pkg/adapter/composio
+	./pkg/provider
+)
