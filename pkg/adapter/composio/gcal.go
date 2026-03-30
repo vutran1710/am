@@ -10,12 +10,14 @@ import (
 )
 
 func fetchGCalEvents(ctx context.Context, client *Client, connID, entityID string, since time.Time) ([]silo.Message, error) {
-	args := map[string]any{}
-	if !since.IsZero() {
-		args["time_min"] = since.Format(time.RFC3339)
+	args := map[string]any{
+		"calendarId":    "primary",
+		"time_min":      since.Format(time.RFC3339),
+		"time_max":      time.Now().Add(7 * 24 * time.Hour).Format(time.RFC3339),
+		"single_events": true,
 	}
 
-	result, err := client.ExecuteTool(ctx, "GOOGLECALENDAR_FIND_EVENT", connID, entityID, args)
+	result, err := client.ExecuteTool(ctx, "GOOGLECALENDAR_EVENTS_LIST", connID, entityID, args)
 	if err != nil {
 		return nil, fmt.Errorf("find events: %w", err)
 	}
@@ -43,18 +45,16 @@ type gcalEvent struct {
 }
 
 func mapGCalEvents(data json.RawMessage) []silo.Message {
-	// Response: {"event_data": {"event_data": [...]}}
+	// EVENTS_LIST response: {"items": [...]}
 	var wrapper struct {
-		EventData struct {
-			EventData []gcalEvent `json:"event_data"`
-		} `json:"event_data"`
+		Items []gcalEvent `json:"items"`
 	}
 	if json.Unmarshal(data, &wrapper) != nil {
 		return nil
 	}
 
 	var msgs []silo.Message
-	for _, e := range wrapper.EventData.EventData {
+	for _, e := range wrapper.Items {
 		raw, _ := json.Marshal(e)
 
 		startTime := e.Start.DateTime
