@@ -15,7 +15,7 @@ type mockClock struct {
 	now time.Time
 }
 
-func (c *mockClock) Now() time.Time                  { return c.now }
+func (c *mockClock) Now() time.Time                   { return c.now }
 func (c *mockClock) NewTicker(d time.Duration) Ticker { return newMockTicker() }
 
 type mockTicker struct {
@@ -31,8 +31,8 @@ func newMockTicker() *mockTicker {
 }
 
 func (t *mockTicker) C() <-chan time.Time { return t.ch }
-func (t *mockTicker) Stop()              { close(t.done) }
-func (t *mockTicker) Tick()              { t.ch <- time.Now() }
+func (t *mockTicker) Stop()               { close(t.done) }
+func (t *mockTicker) Tick()               { t.ch <- time.Now() }
 
 // --- mock store ---
 
@@ -100,7 +100,7 @@ type mockPoller struct {
 }
 
 func (p *mockPoller) Name() string      { return p.name }
-func (p *mockPoller) Source() Source     { return p.source }
+func (p *mockPoller) Source() Source    { return p.source }
 func (p *mockPoller) Mode() AdapterMode { return ModePoll }
 func (p *mockPoller) Poll(ctx context.Context, since Cursor) ([]Message, Cursor, error) {
 	return p.pollFunc(ctx, since)
@@ -115,7 +115,7 @@ type mockWatcher struct {
 }
 
 func (w *mockWatcher) Name() string      { return w.name }
-func (w *mockWatcher) Source() Source     { return w.source }
+func (w *mockWatcher) Source() Source    { return w.source }
 func (w *mockWatcher) Mode() AdapterMode { return ModeWatch }
 func (w *mockWatcher) Watch(ctx context.Context, sink chan<- Message) error {
 	return w.watchFunc(ctx, sink)

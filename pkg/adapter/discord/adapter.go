@@ -41,7 +41,7 @@ func NewAdapter(token, label string, logger *slog.Logger) (*Adapter, error) {
 }
 
 func (a *Adapter) Name() string           { return a.name }
-func (a *Adapter) Source() silo.Source     { return silo.SourceDiscord }
+func (a *Adapter) Source() silo.Source    { return silo.SourceDiscord }
 func (a *Adapter) Mode() silo.AdapterMode { return silo.ModePoll }
 
 func (a *Adapter) Poll(ctx context.Context, since silo.Cursor) ([]silo.Message, silo.Cursor, error) {

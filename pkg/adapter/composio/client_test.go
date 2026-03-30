@@ -62,8 +62,8 @@ func TestCreateConnectLink(t *testing.T) {
 		}
 
 		json.NewEncoder(w).Encode(map[string]any{
-			"redirect_url":        "https://connect.composio.dev/link/lk_abc",
-			"link_token":          "lk_abc",
+			"redirect_url":         "https://connect.composio.dev/link/lk_abc",
+			"link_token":           "lk_abc",
 			"connected_account_id": "ca_123",
 		})
 	}))

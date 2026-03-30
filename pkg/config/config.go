@@ -35,9 +35,9 @@ type Connection struct {
 	Service      string            `toml:"service"`
 	Label        string            `toml:"label"`
 	ConnectionID string            `toml:"connection_id"`
-	Token        string            `toml:"token,omitempty"`  // service-specific credential (e.g. bot token)
+	Token        string            `toml:"token,omitempty"` // service-specific credential (e.g. bot token)
 	Interval     TomlDuration      `toml:"interval"`
-	Extra        map[string]string `toml:"extra,omitempty"`  // additional service-specific config
+	Extra        map[string]string `toml:"extra,omitempty"` // additional service-specific config
 }
 
 // TomlDuration wraps time.Duration for TOML string parsing.

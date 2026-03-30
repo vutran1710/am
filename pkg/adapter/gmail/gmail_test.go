@@ -14,7 +14,7 @@ import (
 
 type mockGmailClient struct {
 	messages map[string]*RawEmail // id -> email
-	listIDs  []string            // IDs returned by ListMessages
+	listIDs  []string             // IDs returned by ListMessages
 }
 
 func (m *mockGmailClient) ListMessages(_ context.Context, query string, pageToken string, maxResults int64) (*MessageList, error) {

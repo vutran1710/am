@@ -25,8 +25,8 @@ type ServiceConfig struct {
 	AppName   string
 	FetchTool string                                    // composio tool slug (ignored if FetchFn set)
 	InputFn   func(since time.Time) map[string]any      // builds tool input (ignored if FetchFn set)
-	MapFn     func(data json.RawMessage) []silo.Message  // maps tool output (ignored if FetchFn set)
-	FetchFn   FetchFunc                                  // custom fetch, bypasses tool execution
+	MapFn     func(data json.RawMessage) []silo.Message // maps tool output (ignored if FetchFn set)
+	FetchFn   FetchFunc                                 // custom fetch, bypasses tool execution
 }
 
 var GmailConfig = ServiceConfig{
@@ -89,7 +89,7 @@ func NewAdapter(client *Client, service ServiceConfig, connectedAccountID, label
 }
 
 func (a *Adapter) Name() string           { return a.name }
-func (a *Adapter) Source() silo.Source     { return a.service.Source }
+func (a *Adapter) Source() silo.Source    { return a.service.Source }
 func (a *Adapter) Mode() silo.AdapterMode { return silo.ModePoll }
 
 func (a *Adapter) Poll(ctx context.Context, since silo.Cursor) ([]silo.Message, silo.Cursor, error) {

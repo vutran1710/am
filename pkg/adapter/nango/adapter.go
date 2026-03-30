@@ -40,7 +40,7 @@ func NewAdapter(client *Client, service ServiceConfig, connectionID string, labe
 }
 
 func (a *Adapter) Name() string           { return a.name }
-func (a *Adapter) Source() silo.Source     { return a.service.Source }
+func (a *Adapter) Source() silo.Source    { return a.service.Source }
 func (a *Adapter) Mode() silo.AdapterMode { return silo.ModePoll }
 
 func (a *Adapter) Poll(ctx context.Context, since silo.Cursor) ([]silo.Message, silo.Cursor, error) {

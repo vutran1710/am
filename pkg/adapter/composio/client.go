@@ -24,14 +24,14 @@ type Client struct {
 // ClientOption configures the client.
 type ClientOption func(*Client)
 
-func WithBaseURL(u string) ClientOption    { return func(c *Client) { c.baseURL = u } }
-func WithMCPURL(u string) ClientOption     { return func(c *Client) { c.mcpURL = u } }
+func WithBaseURL(u string) ClientOption           { return func(c *Client) { c.baseURL = u } }
+func WithMCPURL(u string) ClientOption            { return func(c *Client) { c.mcpURL = u } }
 func WithHTTPClient(hc *http.Client) ClientOption { return func(c *Client) { c.httpClient = hc } }
 
 func NewClient(apiKey string, opts ...ClientOption) *Client {
 	c := &Client{
-		baseURL: defaultBaseURL,
-		apiKey:  apiKey,
+		baseURL:    defaultBaseURL,
+		apiKey:     apiKey,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 	}
 	for _, opt := range opts {
@@ -101,11 +101,11 @@ func (c *Client) CreateConnectLink(ctx context.Context, input CreateConnectLinkI
 
 // ConnectedAccount represents a connected account.
 type ConnectedAccount struct {
-	ID        string       `json:"id"`
-	AppName   string       `json:"appName"`
-	Status    string       `json:"status"`
-	EntityID  string       `json:"entityId"`
-	CreatedAt string       `json:"createdAt"`
+	ID        string        `json:"id"`
+	AppName   string        `json:"appName"`
+	Status    string        `json:"status"`
+	EntityID  string        `json:"entityId"`
+	CreatedAt string        `json:"createdAt"`
 	Params    AccountParams `json:"params"`
 }
 
@@ -268,8 +268,8 @@ func (c *Client) GetOrCreateAuthConfigID(ctx context.Context, toolkitSlug string
 
 func (c *Client) createAuthConfig(ctx context.Context, toolkitSlug string) (string, error) {
 	body, _ := json.Marshal(map[string]any{
-		"toolkit":                        map[string]string{"slug": toolkitSlug},
-		"auth_scheme":                    "OAUTH2",
+		"toolkit":                          map[string]string{"slug": toolkitSlug},
+		"auth_scheme":                      "OAUTH2",
 		"use_composio_managed_credentials": true,
 	})
 

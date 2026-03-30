@@ -176,12 +176,12 @@ func (c *Client) CreateConnectSession(ctx context.Context, input CreateConnectSe
 
 // NangoConnection represents a connection from GET /connections.
 type NangoConnection struct {
-	ID               int               `json:"id"`
-	ConnectionID     string            `json:"connection_id"`
-	ProviderConfigKey string           `json:"provider_config_key"`
-	Provider         string            `json:"provider"`
-	CreatedAt        time.Time         `json:"created_at"`
-	Tags             map[string]string `json:"tags"`
+	ID                int               `json:"id"`
+	ConnectionID      string            `json:"connection_id"`
+	ProviderConfigKey string            `json:"provider_config_key"`
+	Provider          string            `json:"provider"`
+	CreatedAt         time.Time         `json:"created_at"`
+	Tags              map[string]string `json:"tags"`
 }
 
 // ListConnections lists all connections, optionally filtered by search term.

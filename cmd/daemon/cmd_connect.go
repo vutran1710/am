@@ -29,9 +29,9 @@ func newAddCmd() *cobra.Command {
 			// Discord uses its own provider with token-based auth
 			if service == "discord" {
 				if token == "" {
-					return fmt.Errorf("discord requires --token <bot-token>\n\n" +
-						"1. Create a bot at https://discord.com/developers/applications\n" +
-						"2. Copy the bot token\n" +
+					return fmt.Errorf("discord requires --token <bot-token>\n\n"+
+						"1. Create a bot at https://discord.com/developers/applications\n"+
+						"2. Copy the bot token\n"+
 						"3. Run: agent-mesh add discord %s --token <bot-token>", label)
 				}
 				providerName = "discord"

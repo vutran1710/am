@@ -136,10 +136,10 @@ type cursor struct {
 
 // Adapter polls one Gmail account for new messages.
 type Adapter struct {
-	account     string // label for this account (e.g. "personal", "work")
-	client      GmailClient
-	logger      *slog.Logger
-	maxResults  int64
+	account    string // label for this account (e.g. "personal", "work")
+	client     GmailClient
+	logger     *slog.Logger
+	maxResults int64
 }
 
 // NewAdapter creates a Gmail adapter for the given account.
@@ -178,8 +178,8 @@ func NewAdapterWithClient(account string, client GmailClient, logger *slog.Logge
 	}
 }
 
-func (a *Adapter) Name() string        { return "gmail:" + a.account }
-func (a *Adapter) Source() silo.Source  { return silo.SourceGmail }
+func (a *Adapter) Name() string           { return "gmail:" + a.account }
+func (a *Adapter) Source() silo.Source    { return silo.SourceGmail }
 func (a *Adapter) Mode() silo.AdapterMode { return silo.ModePoll }
 
 func (a *Adapter) Poll(ctx context.Context, since silo.Cursor) ([]silo.Message, silo.Cursor, error) {

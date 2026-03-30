@@ -216,11 +216,11 @@ type scanner interface {
 
 func scanMessage(sc scanner) (*silo.Message, error) {
 	var (
-		m           silo.Message
-		source      string
-		raw         string
-		capturedAt  int64
-		sourceTS    int64
+		m          silo.Message
+		source     string
+		raw        string
+		capturedAt int64
+		sourceTS   int64
 	)
 	err := sc.Scan(&m.ID, &source, &m.Sender, &m.Subject, &m.Preview, &raw, &capturedAt, &sourceTS)
 	if err == sql.ErrNoRows {

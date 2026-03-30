@@ -20,7 +20,7 @@ func init() {
 // The bot token lives on each connection, not in global secrets.
 type Provider struct{}
 
-func (p *Provider) Name() string      { return "discord" }
+func (p *Provider) Name() string       { return "discord" }
 func (p *Provider) Services() []string { return []string{"discord"} }
 
 func (p *Provider) Connect(ctx context.Context, service, label string) (*provider.ConnectResult, error) {

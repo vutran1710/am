@@ -7,7 +7,7 @@ import (
 
 // Query filters messages from the store.
 type Query struct {
-	Source *Source     // filter by source, nil means all
+	Source *Source    // filter by source, nil means all
 	Since  *time.Time // messages after this time
 	Until  *time.Time // messages before this time
 	Search string     // full-text search term
