@@ -101,11 +101,24 @@ func (c *Client) CreateConnectLink(ctx context.Context, input CreateConnectLinkI
 
 // ConnectedAccount represents a connected account.
 type ConnectedAccount struct {
-	ID        string `json:"id"`
-	AppName   string `json:"appName"`
-	Status    string `json:"status"`
-	EntityID  string `json:"entityId"`
-	CreatedAt string `json:"createdAt"`
+	ID        string       `json:"id"`
+	AppName   string       `json:"appName"`
+	Status    string       `json:"status"`
+	EntityID  string       `json:"entityId"`
+	CreatedAt string       `json:"createdAt"`
+	Params    AccountParams `json:"params"`
+}
+
+// AccountParams holds the credentials from a connected account.
+type AccountParams struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	Scope       string `json:"scope"`
+}
+
+// AccessToken returns the OAuth access token.
+func (a *ConnectedAccount) AccessToken() string {
+	return a.Params.AccessToken
 }
 
 // ListConnectedAccounts lists connected accounts, optionally filtered.
@@ -145,18 +158,66 @@ func (c *Client) ListConnectedAccounts(ctx context.Context, entityID string) ([]
 	return wrapper.Items, nil
 }
 
-// FindActiveAccount finds the first ACTIVE connected account for an entity+app.
-func (c *Client) FindActiveAccount(ctx context.Context, entityID string) (*ConnectedAccount, error) {
-	accs, err := c.ListConnectedAccounts(ctx, entityID)
+// GetConnectedAccount fetches a single connected account by ID.
+func (c *Client) GetConnectedAccount(ctx context.Context, id string) (*ConnectedAccount, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		c.baseURL+"/connected_accounts/"+id, nil)
 	if err != nil {
 		return nil, err
 	}
-	for _, a := range accs {
-		if a.Status == "ACTIVE" {
-			return &a, nil
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("composio API error (status %d): %s", resp.StatusCode, string(b))
+	}
+
+	var acc ConnectedAccount
+	if err := json.NewDecoder(resp.Body).Decode(&acc); err != nil {
+		return nil, fmt.Errorf("decode: %w", err)
+	}
+	return &acc, nil
+}
+
+// GetAccessToken retrieves the OAuth token for a connected account.
+func (c *Client) GetAccessToken(ctx context.Context, connectionID string) (string, error) {
+	acc, err := c.GetConnectedAccount(ctx, connectionID)
+	if err != nil {
+		return "", err
+	}
+	if acc.Params.AccessToken == "" {
+		return "", fmt.Errorf("no access token for connection %s", connectionID)
+	}
+	return acc.Params.AccessToken, nil
+}
+
+// WaitForActive polls a specific connected account until it becomes ACTIVE.
+func (c *Client) WaitForActive(ctx context.Context, connectionID string) (string, error) {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	timeout := time.After(5 * time.Minute)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-timeout:
+			return "", fmt.Errorf("timed out waiting for connection %s to become active", connectionID)
+		case <-ticker.C:
+			acc, err := c.GetConnectedAccount(ctx, connectionID)
+			if err != nil {
+				continue
+			}
+			if acc.Status == "ACTIVE" {
+				return acc.ID, nil
+			}
 		}
 	}
-	return nil, fmt.Errorf("no ACTIVE connected account found for entity %q", entityID)
 }
 
 // --- Auth Configs ---

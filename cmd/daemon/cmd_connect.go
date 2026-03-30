@@ -39,7 +39,8 @@ func newAddCmd() *cobra.Command {
 			fmt.Print("Complete the authorization in your browser, then press Enter...")
 			fmt.Scanln()
 
-			connID, err := p.ConfirmConnection(ctx, service, label)
+			fmt.Print("Verifying connection...")
+			connID, err := p.ConfirmConnection(ctx, result.ConnectionID)
 			if err != nil {
 				return fmt.Errorf("authorization not confirmed: %w", err)
 			}

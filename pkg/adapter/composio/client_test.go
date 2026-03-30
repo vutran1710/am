@@ -112,24 +112,27 @@ func TestListConnectedAccounts(t *testing.T) {
 	}
 }
 
-func TestFindActiveAccount(t *testing.T) {
+func TestGetConnectedAccount(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/connected_accounts/ca-123" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
 		json.NewEncoder(w).Encode(map[string]any{
-			"items": []map[string]any{
-				{"id": "ca-init", "status": "INITIALIZING"},
-				{"id": "ca-active", "status": "ACTIVE"},
-			},
+			"id": "ca-123", "status": "ACTIVE", "appName": "gmail",
 		})
 	}))
 	defer server.Close()
 
 	client := NewClient("key", WithBaseURL(server.URL))
-	acc, err := client.FindActiveAccount(context.Background(), "user-1")
+	acc, err := client.GetConnectedAccount(context.Background(), "ca-123")
 	if err != nil {
-		t.Fatalf("find: %v", err)
+		t.Fatalf("get: %v", err)
 	}
-	if acc.ID != "ca-active" {
-		t.Errorf("id = %q, want ca-active", acc.ID)
+	if acc.ID != "ca-123" {
+		t.Errorf("id = %q", acc.ID)
+	}
+	if acc.Status != "ACTIVE" {
+		t.Errorf("status = %q", acc.Status)
 	}
 }
 
