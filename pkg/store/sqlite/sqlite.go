@@ -48,10 +48,12 @@ func migrate(db *sql.DB) error {
 		preview     TEXT DEFAULT '',
 		raw         TEXT NOT NULL,
 		captured_at INTEGER NOT NULL,
-		source_ts   INTEGER DEFAULT 0
+		source_ts   INTEGER DEFAULT 0,
+		status      TEXT DEFAULT 'raw'
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_messages_source_ts ON messages(source, source_ts);
+	CREATE INDEX IF NOT EXISTS idx_messages_status ON messages(status);
 
 	CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
 		sender, subject, preview, content=messages, content_rowid=rowid
@@ -66,6 +68,28 @@ func migrate(db *sql.DB) error {
 		adapter TEXT PRIMARY KEY,
 		data    BLOB NOT NULL
 	);
+
+	CREATE TABLE IF NOT EXISTS standardized (
+		message_id  TEXT PRIMARY KEY REFERENCES messages(id),
+		clean_text  TEXT DEFAULT '',
+		from_name   TEXT DEFAULT '',
+		from_email  TEXT DEFAULT '',
+		action      TEXT DEFAULT '',
+		deadline    TEXT DEFAULT '',
+		summary     TEXT DEFAULT ''
+	);
+
+	CREATE TABLE IF NOT EXISTS evaluations (
+		message_id    TEXT PRIMARY KEY REFERENCES messages(id),
+		importance    INTEGER DEFAULT 0,
+		category      TEXT DEFAULT '',
+		action_needed INTEGER DEFAULT 0,
+		urgency       TEXT DEFAULT '',
+		notify        INTEGER DEFAULT 0,
+		reason        TEXT DEFAULT ''
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_evaluations_importance ON evaluations(importance);
 	`
 	_, err := db.Exec(ddl)
 	return err
@@ -207,6 +231,79 @@ func (s *Store) SaveCursor(ctx context.Context, adapterName string, c silo.Curso
 
 func (s *Store) Close() error {
 	return s.db.Close()
+}
+
+// --- Pipeline operations ---
+
+func (s *Store) ListByStatus(ctx context.Context, status string, limit int) ([]silo.Message, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, source, sender, subject, preview, raw, captured_at, source_ts
+		 FROM messages WHERE status = ? ORDER BY source_ts DESC LIMIT ?`, status, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanMessages(rows)
+}
+
+func (s *Store) UpdateStatus(ctx context.Context, id, status string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE messages SET status = ? WHERE id = ?`, status, id)
+	return err
+}
+
+func (s *Store) SaveStandardized(ctx context.Context, std *silo.Standardized) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO standardized (message_id, clean_text, from_name, from_email, action, deadline, summary)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(message_id) DO UPDATE SET
+		   clean_text=excluded.clean_text, from_name=excluded.from_name, from_email=excluded.from_email,
+		   action=excluded.action, deadline=excluded.deadline, summary=excluded.summary`,
+		std.MessageID, std.CleanText, std.FromName, std.FromEmail, std.Action, std.Deadline, std.Summary)
+	return err
+}
+
+func (s *Store) GetStandardized(ctx context.Context, messageID string) (*silo.Standardized, error) {
+	var std silo.Standardized
+	err := s.db.QueryRowContext(ctx,
+		`SELECT message_id, clean_text, from_name, from_email, action, deadline, summary
+		 FROM standardized WHERE message_id = ?`, messageID).Scan(
+		&std.MessageID, &std.CleanText, &std.FromName, &std.FromEmail, &std.Action, &std.Deadline, &std.Summary)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &std, nil
+}
+
+func (s *Store) SaveEvaluation(ctx context.Context, eval *silo.Evaluation) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO evaluations (message_id, importance, category, action_needed, urgency, notify, reason)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(message_id) DO UPDATE SET
+		   importance=excluded.importance, category=excluded.category, action_needed=excluded.action_needed,
+		   urgency=excluded.urgency, notify=excluded.notify, reason=excluded.reason`,
+		eval.MessageID, eval.Importance, eval.Category, eval.ActionNeeded, eval.Urgency, eval.Notify, eval.Reason)
+	return err
+}
+
+func (s *Store) GetEvaluation(ctx context.Context, messageID string) (*silo.Evaluation, error) {
+	var eval silo.Evaluation
+	var actionNeeded, notify int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT message_id, importance, category, action_needed, urgency, notify, reason
+		 FROM evaluations WHERE message_id = ?`, messageID).Scan(
+		&eval.MessageID, &eval.Importance, &eval.Category, &actionNeeded, &eval.Urgency, &notify, &eval.Reason)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	eval.ActionNeeded = actionNeeded != 0
+	eval.Notify = notify != 0
+	return &eval, nil
 }
 
 // scanner abstracts *sql.Row and *sql.Rows for shared scanning.
