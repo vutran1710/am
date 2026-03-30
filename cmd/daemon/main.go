@@ -9,6 +9,7 @@ import (
 
 	// Register providers via init()
 	_ "github.com/vutran/agent-mesh/pkg/adapter/composio"
+	_ "github.com/vutran/agent-mesh/pkg/adapter/discord"
 	_ "github.com/vutran/agent-mesh/pkg/adapter/nango"
 )
 

@@ -10,5 +10,6 @@ use (
 	./pkg/adapter/gmail
 	./pkg/adapter/nango
 	./pkg/adapter/composio
+	./pkg/adapter/discord
 	./pkg/provider
 )

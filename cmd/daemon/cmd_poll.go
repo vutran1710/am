@@ -38,7 +38,11 @@ func runPoll(ctx context.Context, service, label string) error {
 		return err
 	}
 
-	adapter, err := p.NewPoller(service, label, conn.ConnectionID, logger)
+	connID := conn.ConnectionID
+	if conn.Token != "" {
+		connID = conn.Token
+	}
+	adapter, err := p.NewPoller(service, label, connID, logger)
 	if err != nil {
 		return err
 	}

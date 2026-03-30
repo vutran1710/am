@@ -69,7 +69,12 @@ func registerAdapters(s *silo.Silo, conns []config.Connection, logger *slog.Logg
 			continue
 		}
 
-		adapter, err := p.NewPoller(conn.Service, conn.Label, conn.ConnectionID, logger)
+		// Use Token if available (e.g. Discord bot token), otherwise ConnectionID
+		connID := conn.ConnectionID
+		if conn.Token != "" {
+			connID = conn.Token
+		}
+		adapter, err := p.NewPoller(conn.Service, conn.Label, connID, logger)
 		if err != nil {
 			logger.Warn("skipping connection", "label", conn.Label, "err", err)
 			continue
