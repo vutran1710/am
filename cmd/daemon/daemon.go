@@ -11,16 +11,19 @@ import (
 	"time"
 
 	"github.com/vutran/agent-mesh/pkg/config"
+	"github.com/vutran/agent-mesh/pkg/llm"
+	"github.com/vutran/agent-mesh/pkg/pipeline"
 	"github.com/vutran/agent-mesh/pkg/provider"
 	"github.com/vutran/agent-mesh/pkg/silo"
 	sqlitestore "github.com/vutran/agent-mesh/pkg/store/sqlite"
 )
 
 type Daemon struct {
-	cfg    *config.Config
-	logger *slog.Logger
-	server *http.Server
-	silo   *silo.Silo
+	cfg      *config.Config
+	logger   *slog.Logger
+	server   *http.Server
+	silo     *silo.Silo
+	pipeline *pipeline.Pipeline
 }
 
 func NewDaemon(cfg *config.Config, logger *slog.Logger) (*Daemon, error) {
@@ -41,11 +44,27 @@ func NewDaemon(cfg *config.Config, logger *slog.Logger) (*Daemon, error) {
 		registerAdapters(s, cfg.Connections, logger)
 	}
 
+	// Set up pipeline if LLM is configured
+	var pipe *pipeline.Pipeline
+	if cfg.Pipeline.Stage1.Mode != "" {
+		pipe, err = setupPipeline(cfg, store, logger)
+		if err != nil {
+			logger.Warn("pipeline not started", "err", err)
+		} else {
+			logger.Info("pipeline enabled",
+				"stage1", cfg.Pipeline.Stage1.Mode,
+				"stage2", cfg.Pipeline.Stage2.Mode,
+				"notify_min", cfg.Pipeline.NotifyMin,
+			)
+		}
+	}
+
 	mux := http.NewServeMux()
 	d := &Daemon{
-		cfg:    cfg,
-		logger: logger,
-		silo:   s,
+		cfg:      cfg,
+		logger:   logger,
+		silo:     s,
+		pipeline: pipe,
 		server: &http.Server{
 			Addr:         cfg.Daemon.Addr,
 			Handler:      mux,
@@ -61,6 +80,50 @@ func NewDaemon(cfg *config.Config, logger *slog.Logger) (*Daemon, error) {
 	return d, nil
 }
 
+func setupPipeline(cfg *config.Config, store *sqlitestore.Store, logger *slog.Logger) (*pipeline.Pipeline, error) {
+	stage1, err := createLLMBackend(cfg.Pipeline.Stage1)
+	if err != nil {
+		return nil, err
+	}
+
+	stage2 := stage1 // default: same backend for both stages
+	if cfg.Pipeline.Stage2.Mode != "" {
+		stage2, err = createLLMBackend(cfg.Pipeline.Stage2)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	profile, instructions := config.LoadContext(dataDir)
+
+	return pipeline.New(pipeline.Config{
+		Store:        store,
+		Stage1:       stage1,
+		Stage2:       stage2,
+		Profile:      profile,
+		Instructions: instructions,
+		NotifyMin:    cfg.Pipeline.NotifyMin,
+		Logger:       logger,
+	}), nil
+}
+
+func createLLMBackend(cfg config.LLMBackendConfig) (llm.LLM, error) {
+	switch cfg.Mode {
+	case "api":
+		if cfg.APIURL == "" {
+			return nil, errors.New("api_url required for api mode")
+		}
+		return llm.NewAPIBackend(cfg.APIURL, cfg.APIKey, cfg.Model), nil
+	case "stdin":
+		if cfg.Command == "" {
+			return nil, errors.New("command required for stdin mode")
+		}
+		return llm.NewStdinBackend(cfg.Command)
+	default:
+		return nil, errors.New("unknown llm mode: " + cfg.Mode)
+	}
+}
+
 func registerAdapters(s *silo.Silo, conns []config.Connection, logger *slog.Logger) {
 	for _, conn := range conns {
 		p, err := provider.Get(conn.Provider, dataDir)
@@ -69,7 +132,6 @@ func registerAdapters(s *silo.Silo, conns []config.Connection, logger *slog.Logg
 			continue
 		}
 
-		// Use Token if available (e.g. Discord bot token), otherwise ConnectionID
 		connID := conn.ConnectionID
 		if conn.Token != "" {
 			connID = conn.Token
@@ -94,6 +156,14 @@ func (d *Daemon) Run(ctx context.Context) error {
 			d.logger.Error("silo scheduler error", "err", err)
 		}
 	}()
+
+	if d.pipeline != nil {
+		go func() {
+			if err := d.pipeline.Run(ctx); err != nil && ctx.Err() == nil {
+				d.logger.Error("pipeline error", "err", err)
+			}
+		}()
+	}
 
 	errCh := make(chan error, 1)
 	go func() {

@@ -13,7 +13,24 @@ import (
 type Config struct {
 	Daemon      DaemonConfig `toml:"daemon"`
 	Secrets     Secrets      `toml:"secrets"`
+	Pipeline    PipelineConfig `toml:"pipeline"`
 	Connections []Connection `toml:"connection"`
+}
+
+// LLMBackendConfig configures one LLM backend.
+type LLMBackendConfig struct {
+	Mode    string `toml:"mode"`     // "api" or "stdin"
+	APIURL  string `toml:"api_url"`  // OpenAI-compatible endpoint (api mode)
+	APIKey  string `toml:"api_key"`  // API key (api mode)
+	Model   string `toml:"model"`    // model name (api mode)
+	Command string `toml:"command"`  // shell command (stdin mode)
+}
+
+// PipelineConfig configures the message processing pipeline.
+type PipelineConfig struct {
+	Stage1     LLMBackendConfig `toml:"stage1"`     // standardize
+	Stage2     LLMBackendConfig `toml:"stage2"`     // evaluate
+	NotifyMin  int              `toml:"notify_min"`  // minimum importance to notify (default 7)
 }
 
 // DaemonConfig holds daemon runtime settings.
@@ -103,7 +120,22 @@ func Load(dataDir string) (*Config, error) {
 		cfg.Daemon.LogLevel = v
 	}
 
+	if cfg.Pipeline.NotifyMin == 0 {
+		cfg.Pipeline.NotifyMin = 7
+	}
+
 	return cfg, nil
+}
+
+// LoadContext reads the markdown context files from the config directory.
+func LoadContext(dataDir string) (profile, instructions string) {
+	if data, err := os.ReadFile(filepath.Join(dataDir, "context", "profile.md")); err == nil {
+		profile = string(data)
+	}
+	if data, err := os.ReadFile(filepath.Join(dataDir, "context", "instructions.md")); err == nil {
+		instructions = string(data)
+	}
+	return
 }
 
 // Save writes the full config to ~/.agent-mesh/config.toml (0600 for secrets).

@@ -8,7 +8,9 @@ require (
 	github.com/vutran/agent-mesh/pkg/adapter/discord v0.0.0
 	github.com/vutran/agent-mesh/pkg/adapter/nango v0.0.0
 	github.com/vutran/agent-mesh/pkg/config v0.0.0
+	github.com/vutran/agent-mesh/pkg/llm v0.0.0
 	github.com/vutran/agent-mesh/pkg/log v0.0.0
+	github.com/vutran/agent-mesh/pkg/pipeline v0.0.0
 	github.com/vutran/agent-mesh/pkg/provider v0.0.0
 	github.com/vutran/agent-mesh/pkg/silo v0.0.0
 	github.com/vutran/agent-mesh/pkg/store/sqlite v0.0.0
@@ -39,7 +41,9 @@ replace (
 	github.com/vutran/agent-mesh/pkg/adapter/discord => ../../pkg/adapter/discord
 	github.com/vutran/agent-mesh/pkg/adapter/nango => ../../pkg/adapter/nango
 	github.com/vutran/agent-mesh/pkg/config => ../../pkg/config
+	github.com/vutran/agent-mesh/pkg/llm => ../../pkg/llm
 	github.com/vutran/agent-mesh/pkg/log => ../../pkg/log
+	github.com/vutran/agent-mesh/pkg/pipeline => ../../pkg/pipeline
 	github.com/vutran/agent-mesh/pkg/provider => ../../pkg/provider
 	github.com/vutran/agent-mesh/pkg/silo => ../../pkg/silo
 	github.com/vutran/agent-mesh/pkg/store/sqlite => ../../pkg/store/sqlite

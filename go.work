@@ -12,4 +12,6 @@ use (
 	./pkg/adapter/composio
 	./pkg/adapter/discord
 	./pkg/provider
+	./pkg/llm
+	./pkg/pipeline
 )
