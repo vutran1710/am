@@ -22,7 +22,7 @@ type DaemonConfig struct {
 	LogLevel string `toml:"log_level"`
 }
 
-// Secrets holds sensitive credentials.
+// Secrets holds provider-level credentials (integration platforms only).
 type Secrets struct {
 	ComposioAPIKey string `toml:"composio_api_key"`
 	ComposioMCPURL string `toml:"composio_mcp_url"`
@@ -31,11 +31,13 @@ type Secrets struct {
 
 // Connection defines a service connection to poll.
 type Connection struct {
-	Provider     string       `toml:"provider"`
-	Service      string       `toml:"service"`
-	Label        string       `toml:"label"`
-	ConnectionID string       `toml:"connection_id"`
-	Interval     TomlDuration `toml:"interval"`
+	Provider     string            `toml:"provider"`
+	Service      string            `toml:"service"`
+	Label        string            `toml:"label"`
+	ConnectionID string            `toml:"connection_id"`
+	Token        string            `toml:"token,omitempty"`  // service-specific credential (e.g. bot token)
+	Interval     TomlDuration      `toml:"interval"`
+	Extra        map[string]string `toml:"extra,omitempty"`  // additional service-specific config
 }
 
 // TomlDuration wraps time.Duration for TOML string parsing.

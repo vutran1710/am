@@ -62,13 +62,9 @@ var GCalConfig = ServiceConfig{
 }
 
 var DiscordConfig = ServiceConfig{
-	Source:    silo.SourceDiscord,
-	AppName:   "discord",
-	FetchTool: "DISCORD_FETCH_MESSAGES",
-	InputFn: func(since time.Time) map[string]any {
-		return map[string]any{}
-	},
-	MapFn: mapGenericItems,
+	Source:  silo.SourceDiscord,
+	AppName: "discordbot",
+	FetchFn: fetchDiscordMessages,
 }
 
 // Adapter polls a Composio integration via tool execution.

@@ -27,7 +27,7 @@ var appNames = map[string]string{
 	"gmail":   "gmail",
 	"slack":   "slack",
 	"gcal":    "google_calendar",
-	"discord": "discord",
+	"discord": "discordbot",
 }
 
 // Provider implements provider.Provider for Composio.
