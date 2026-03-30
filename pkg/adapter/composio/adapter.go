@@ -15,13 +15,18 @@ type cursor struct {
 	After time.Time `json:"after"`
 }
 
+// FetchFunc is a custom fetch implementation that bypasses Composio tool execution.
+// Used when the service's native API is more capable (e.g. Slack search.messages).
+type FetchFunc func(ctx context.Context, client *Client, connID, entityID string, since time.Time) ([]silo.Message, error)
+
 // ServiceConfig defines how to poll a Composio integration.
 type ServiceConfig struct {
-	Source   silo.Source
-	AppName  string            // composio app name (e.g. "gmail")
-	FetchTool string           // tool slug for fetching messages (e.g. "GMAIL_FETCH_EMAILS")
-	InputFn  func(since time.Time) map[string]any // builds tool input params
-	MapFn    func(data json.RawMessage) []silo.Message // maps tool output to messages
+	Source    silo.Source
+	AppName   string
+	FetchTool string                                    // composio tool slug (ignored if FetchFn set)
+	InputFn   func(since time.Time) map[string]any      // builds tool input (ignored if FetchFn set)
+	MapFn     func(data json.RawMessage) []silo.Message  // maps tool output (ignored if FetchFn set)
+	FetchFn   FetchFunc                                  // custom fetch, bypasses tool execution
 }
 
 var GmailConfig = ServiceConfig{
@@ -41,13 +46,9 @@ var GmailConfig = ServiceConfig{
 }
 
 var SlackConfig = ServiceConfig{
-	Source:    silo.SourceSlack,
-	AppName:   "slack",
-	FetchTool: "SLACK_FETCH_MESSAGES",
-	InputFn: func(since time.Time) map[string]any {
-		return map[string]any{}
-	},
-	MapFn: mapGenericItems,
+	Source:  silo.SourceSlack,
+	AppName: "slack",
+	FetchFn: fetchSlackMessages,
 }
 
 var GCalConfig = ServiceConfig{
@@ -107,18 +108,21 @@ func (a *Adapter) Poll(ctx context.Context, since silo.Cursor) ([]silo.Message, 
 		cur.After = time.Now().Add(-24 * time.Hour)
 	}
 
-	input := a.service.InputFn(cur.After)
+	var msgs []silo.Message
+	var err error
 
-	a.logger.Debug("executing tool", "tool", a.service.FetchTool)
-
-	result, err := a.client.ExecuteTool(ctx, a.service.FetchTool, a.connectedAccountID, a.entityID, input)
+	if a.service.FetchFn != nil {
+		// Custom fetch (e.g. direct Slack API)
+		msgs, err = a.service.FetchFn(ctx, a.client, a.connectedAccountID, a.entityID, cur.After)
+	} else {
+		// Standard Composio tool execution
+		msgs, err = a.pollViaTool(ctx, cur.After)
+	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("execute %s: %w", a.service.FetchTool, err)
+		return nil, nil, err
 	}
 
-	msgs := a.service.MapFn(result.Data)
-
-	// Prefix IDs with source and label
+	// Prefix IDs
 	for i := range msgs {
 		msgs[i].ID = fmt.Sprintf("%s:%s:%s", a.service.Source, a.connectedAccountID, msgs[i].ID)
 		msgs[i].CapturedAt = time.Now()
@@ -128,6 +132,18 @@ func (a *Adapter) Poll(ctx context.Context, since silo.Cursor) ([]silo.Message, 
 	cursorBytes, _ := json.Marshal(newCursor)
 
 	return msgs, silo.Cursor(cursorBytes), nil
+}
+
+func (a *Adapter) pollViaTool(ctx context.Context, since time.Time) ([]silo.Message, error) {
+	input := a.service.InputFn(since)
+	a.logger.Debug("executing tool", "tool", a.service.FetchTool)
+
+	result, err := a.client.ExecuteTool(ctx, a.service.FetchTool, a.connectedAccountID, a.entityID, input)
+	if err != nil {
+		return nil, fmt.Errorf("execute %s: %w", a.service.FetchTool, err)
+	}
+
+	return a.service.MapFn(result.Data), nil
 }
 
 // --- Mappers ---

@@ -82,16 +82,14 @@ func (p *Provider) Connect(ctx context.Context, service, label string) (*provide
 		return nil, fmt.Errorf("create connect link: %w", err)
 	}
 
-	return &provider.ConnectResult{AuthURL: link.RedirectURL}, nil
+	return &provider.ConnectResult{
+		AuthURL:      link.RedirectURL,
+		ConnectionID: link.ConnectedAccountID,
+	}, nil
 }
 
-func (p *Provider) ConfirmConnection(ctx context.Context, service, label string) (string, error) {
-	entityID := fmt.Sprintf("agent-mesh:%s:%s", service, label)
-	active, err := p.client.FindActiveAccount(ctx, entityID)
-	if err != nil {
-		return "", err
-	}
-	return active.ID, nil
+func (p *Provider) ConfirmConnection(ctx context.Context, connectionID string) (string, error) {
+	return p.client.WaitForActive(ctx, connectionID)
 }
 
 func (p *Provider) NewPoller(service, label, connectionID string, logger *slog.Logger) (silo.Poller, error) {

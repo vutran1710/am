@@ -71,15 +71,22 @@ func (p *Provider) Connect(ctx context.Context, service, label string) (*provide
 		return nil, fmt.Errorf("create connect session: %w", err)
 	}
 
-	return &provider.ConnectResult{AuthURL: sess.ConnectLink}, nil
-}
-
-func (p *Provider) ConfirmConnection(ctx context.Context, service, label string) (string, error) {
-	integrationKey, ok := integrationKeys[service]
-	if !ok {
-		return "", fmt.Errorf("unsupported service %q", service)
+	// Nango doesn't return a connection ID upfront — snapshot existing ones
+	// so ConfirmConnection can detect the new one
+	before, _ := p.client.ListConnections(ctx, "")
+	existingIDs := make([]string, 0, len(before))
+	for _, c := range before {
+		existingIDs = append(existingIDs, c.ConnectionID)
 	}
 
+	return &provider.ConnectResult{
+		AuthURL:      sess.ConnectLink,
+		ConnectionID: integrationKey + ":" + label, // used as hint, not actual ID
+	}, nil
+}
+
+func (p *Provider) ConfirmConnection(ctx context.Context, connectionHint string) (string, error) {
+	// For Nango, connectionHint is "integrationKey:label" — we poll for a new connection
 	before, _ := p.client.ListConnections(ctx, "")
 	existingIDs := make(map[string]bool)
 	for _, c := range before {
@@ -102,7 +109,7 @@ func (p *Provider) ConfirmConnection(ctx context.Context, service, label string)
 				continue
 			}
 			for _, c := range conns {
-				if c.ProviderConfigKey == integrationKey && !existingIDs[c.ConnectionID] {
+				if !existingIDs[c.ConnectionID] {
 					return c.ConnectionID, nil
 				}
 			}
