@@ -34,6 +34,45 @@ A **real-time notification stream** that surfaces relevant messages from all con
 
 ---
 
+## Phase 1b — macOS Client
+
+### Goal
+
+Native macOS status bar app that connects to the daemon. The single surface for observing everything.
+
+### What ships
+
+A **SwiftUI menu bar app**:
+
+- Lives in the system tray — no dock icon, no window clutter
+- Connects to the daemon HTTP API (`localhost:8080`)
+- Shows unread count badge on the menu bar icon
+- Click to see recent messages grouped by source (Gmail, Slack, etc.)
+- macOS native notifications for new messages (respects Do Not Disturb)
+- Quick actions: mark read, snooze, open original
+
+### Tech
+
+- SwiftUI + AppKit (native macOS, no Electron)
+- Menu bar app using `NSStatusItem`
+- Polls daemon `/api/messages` or connects via SSE/WebSocket
+- Notifications via `UNUserNotificationCenter`
+- Lives in `clients/macos/` in the monorepo
+
+### User value
+
+- One glance at the menu bar = "do I have anything to deal with?"
+- Native notifications = informed without opening anything
+- No browser tabs, no app switching
+
+### Why it works
+
+- Invisible when not needed (status bar only)
+- Native performance and OS integration
+- Connects to existing daemon — no new backend work
+
+---
+
 ## Phase 2 — Analyze & Schedule
 
 ### Goal
