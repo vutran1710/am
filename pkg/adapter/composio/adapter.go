@@ -52,13 +52,9 @@ var SlackConfig = ServiceConfig{
 }
 
 var GCalConfig = ServiceConfig{
-	Source:    silo.SourceGCal,
-	AppName:   "google_calendar",
-	FetchTool: "GOOGLECALENDAR_FIND_EVENT",
-	InputFn: func(since time.Time) map[string]any {
-		return map[string]any{}
-	},
-	MapFn: mapGenericItems,
+	Source:  silo.SourceGCal,
+	AppName: "googlecalendar",
+	FetchFn: fetchGCalEvents,
 }
 
 var DiscordConfig = ServiceConfig{
@@ -78,9 +74,10 @@ type Adapter struct {
 }
 
 // NewAdapter creates a Composio adapter.
-func NewAdapter(client *Client, service ServiceConfig, connectedAccountID, label string, logger *slog.Logger) *Adapter {
+// serviceSlug is the user-facing service name (e.g. "gcal"), used for entity ID.
+func NewAdapter(client *Client, service ServiceConfig, connectedAccountID, label, serviceSlug string, logger *slog.Logger) *Adapter {
 	name := fmt.Sprintf("composio:%s:%s", service.AppName, label)
-	entityID := fmt.Sprintf("agent-mesh:%s:%s", service.AppName, label)
+	entityID := fmt.Sprintf("agent-mesh:%s:%s", serviceSlug, label)
 	return &Adapter{
 		name:               name,
 		connectedAccountID: connectedAccountID,

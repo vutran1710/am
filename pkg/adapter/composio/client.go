@@ -251,8 +251,12 @@ func (c *Client) GetOrCreateAuthConfigID(ctx context.Context, toolkitSlug string
 		var wrapper struct {
 			Items []AuthConfig `json:"items"`
 		}
-		if json.NewDecoder(resp.Body).Decode(&wrapper) == nil && len(wrapper.Items) > 0 {
-			return wrapper.Items[0].ID, nil
+		if json.NewDecoder(resp.Body).Decode(&wrapper) == nil {
+			for _, item := range wrapper.Items {
+				if item.Toolkit.Slug == toolkitSlug {
+					return item.ID, nil
+				}
+			}
 		}
 	} else {
 		io.ReadAll(resp.Body) // drain

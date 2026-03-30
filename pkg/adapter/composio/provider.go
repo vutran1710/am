@@ -26,7 +26,7 @@ var serviceConfigs = map[string]ServiceConfig{
 var appNames = map[string]string{
 	"gmail":   "gmail",
 	"slack":   "slack",
-	"gcal":    "google_calendar",
+	"gcal":    "googlecalendar",
 	"discord": "discordbot",
 }
 
@@ -97,5 +97,5 @@ func (p *Provider) NewPoller(service, label, connectionID string, logger *slog.L
 	if !ok {
 		return nil, fmt.Errorf("unsupported service %q", service)
 	}
-	return NewAdapter(p.client, svcCfg, connectionID, label, logger), nil
+	return NewAdapter(p.client, svcCfg, connectionID, label, service, logger), nil
 }

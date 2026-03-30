@@ -103,12 +103,5 @@ func newAddCmd() *cobra.Command {
 }
 
 func defaultInterval(service string) time.Duration {
-	switch service {
-	case "slack", "discord":
-		return 1 * time.Minute
-	case "gcal":
-		return 10 * time.Minute
-	default:
-		return 5 * time.Minute
-	}
+	return 5 * time.Minute
 }
