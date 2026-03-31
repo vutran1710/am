@@ -79,6 +79,7 @@ func (p *Pipeline) Run(ctx context.Context) error {
 					continue
 				}
 				processed++
+				time.Sleep(1 * time.Second) // rate limit protection
 			}
 		}
 
@@ -93,6 +94,7 @@ func (p *Pipeline) Run(ctx context.Context) error {
 					continue
 				}
 				processed++
+				time.Sleep(1 * time.Second) // rate limit protection
 			}
 		}
 
