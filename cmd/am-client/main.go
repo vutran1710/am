@@ -31,6 +31,7 @@ func main() {
 		newGetCmd(),
 		newStatsCmd(),
 		newSearchCmd(),
+		newDBCmd(),
 	)
 
 	if err := root.Execute(); err != nil {
