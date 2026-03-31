@@ -17,7 +17,7 @@ type Query struct {
 
 // Store persists and retrieves messages.
 type Store interface {
-	// Put saves one or more messages. Existing IDs are skipped (upsert).
+	// Put saves one or more messages. Existing IDs are skipped.
 	Put(ctx context.Context, msgs ...Message) error
 
 	// Get retrieves a single message by ID.
@@ -25,12 +25,6 @@ type Store interface {
 
 	// List queries messages matching the filter.
 	List(ctx context.Context, q Query) ([]Message, error)
-
-	// LoadCursor returns the last saved cursor for an adapter.
-	LoadCursor(ctx context.Context, adapterName string) (Cursor, error)
-
-	// SaveCursor persists the cursor for an adapter.
-	SaveCursor(ctx context.Context, adapterName string, c Cursor) error
 
 	// Close releases any resources held by the store.
 	Close() error

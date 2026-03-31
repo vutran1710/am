@@ -1,85 +1,24 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/BurntSushi/toml"
 )
 
-// Config is the complete application config loaded from ~/.agent-mesh/config.toml.
+// Config is the application config loaded from ~/.agent-mesh/config.toml.
 type Config struct {
-	Daemon      DaemonConfig `toml:"daemon"`
-	Secrets     Secrets      `toml:"secrets"`
-	Pipeline    PipelineConfig `toml:"pipeline"`
-	Connections []Connection `toml:"connection"`
+	Server ServerConfig `toml:"server"`
 }
 
-// LLMBackendConfig configures one LLM backend.
-type LLMBackendConfig struct {
-	Mode    string `toml:"mode"`     // "api" or "stdin"
-	APIURL  string `toml:"api_url"`  // OpenAI-compatible endpoint (api mode)
-	APIKey  string `toml:"api_key"`  // API key (api mode)
-	Model   string `toml:"model"`    // model name (api mode)
-	Command string `toml:"command"`  // shell command (stdin mode)
-}
-
-// PipelineConfig configures the message processing pipeline.
-type PipelineConfig struct {
-	Stage1     LLMBackendConfig `toml:"stage1"`     // standardize
-	Stage2     LLMBackendConfig `toml:"stage2"`     // evaluate
-	NotifyMin  int              `toml:"notify_min"`  // minimum importance to notify (default 7)
-}
-
-// DaemonConfig holds daemon runtime settings.
-type DaemonConfig struct {
-	Addr     string `toml:"addr"`
-	LogLevel string `toml:"log_level"`
-}
-
-// Secrets holds provider-level credentials (integration platforms only).
-type Secrets struct {
-	ComposioAPIKey string `toml:"composio_api_key"`
-	ComposioMCPURL string `toml:"composio_mcp_url"`
-	NangoSecretKey string `toml:"nango_secret_key"`
-}
-
-// Connection defines a service connection to poll.
-type Connection struct {
-	Provider     string            `toml:"provider"`
-	Service      string            `toml:"service"`
-	Label        string            `toml:"label"`
-	ConnectionID string            `toml:"connection_id"`
-	Token        string            `toml:"token,omitempty"` // service-specific credential (e.g. bot token)
-	Interval     TomlDuration      `toml:"interval"`
-	Extra        map[string]string `toml:"extra,omitempty"` // additional service-specific config
-}
-
-// TomlDuration wraps time.Duration for TOML string parsing.
-type TomlDuration time.Duration
-
-func (d *TomlDuration) UnmarshalText(text []byte) error {
-	dur, err := time.ParseDuration(string(text))
-	if err != nil {
-		return err
-	}
-	*d = TomlDuration(dur)
-	return nil
-}
-
-func (d TomlDuration) MarshalText() ([]byte, error) {
-	return []byte(time.Duration(d).String()), nil
-}
-
-func (d TomlDuration) Duration() time.Duration {
-	return time.Duration(d)
-}
-
-// ToDuration converts a time.Duration to a TomlDuration.
-func ToDuration(d time.Duration) TomlDuration {
-	return TomlDuration(d)
+// ServerConfig holds server settings.
+type ServerConfig struct {
+	Addr   string `toml:"addr"`
+	APIKey string `toml:"api_key"` // private key for API access
 }
 
 // DataDir returns the config directory path.
@@ -97,13 +36,11 @@ func configPath(dataDir string) string {
 	return filepath.Join(dataDir, "config.toml")
 }
 
-// Load reads the full config from ~/.agent-mesh/config.toml.
-// Missing file returns defaults. Env vars override daemon settings.
+// Load reads config from ~/.agent-mesh/config.toml.
 func Load(dataDir string) (*Config, error) {
 	cfg := &Config{
-		Daemon: DaemonConfig{
-			Addr:     ":8080",
-			LogLevel: "info",
+		Server: ServerConfig{
+			Addr: ":8090",
 		},
 	}
 
@@ -112,33 +49,20 @@ func Load(dataDir string) (*Config, error) {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 
-	// Env var overrides
-	if v := os.Getenv("DAEMON_ADDR"); v != "" {
-		cfg.Daemon.Addr = v
-	}
-	if v := os.Getenv("LOG_LEVEL"); v != "" {
-		cfg.Daemon.LogLevel = v
+	if v := os.Getenv("AM_ADDR"); v != "" {
+		cfg.Server.Addr = v
 	}
 
-	if cfg.Pipeline.NotifyMin == 0 {
-		cfg.Pipeline.NotifyMin = 7
+	// Auto-generate API key if missing
+	if cfg.Server.APIKey == "" {
+		cfg.Server.APIKey = generateKey()
+		Save(dataDir, cfg)
 	}
 
 	return cfg, nil
 }
 
-// LoadContext reads the markdown context files from the config directory.
-func LoadContext(dataDir string) (profile, instructions string) {
-	if data, err := os.ReadFile(filepath.Join(dataDir, "context", "profile.md")); err == nil {
-		profile = string(data)
-	}
-	if data, err := os.ReadFile(filepath.Join(dataDir, "context", "instructions.md")); err == nil {
-		instructions = string(data)
-	}
-	return
-}
-
-// Save writes the full config to ~/.agent-mesh/config.toml (0600 for secrets).
+// Save writes config to ~/.agent-mesh/config.toml.
 func Save(dataDir string, cfg *Config) error {
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return err
@@ -151,39 +75,8 @@ func Save(dataDir string, cfg *Config) error {
 	return toml.NewEncoder(f).Encode(cfg)
 }
 
-// ComposioKey returns the Composio API key or an error.
-func (c *Config) ComposioKey() (string, error) {
-	if c.Secrets.ComposioAPIKey == "" {
-		return "", fmt.Errorf("composio_api_key not set — run 'agent-mesh init'")
-	}
-	return c.Secrets.ComposioAPIKey, nil
-}
-
-// NangoKey returns the Nango secret key or an error.
-func (c *Config) NangoKey() (string, error) {
-	if c.Secrets.NangoSecretKey == "" {
-		return "", fmt.Errorf("nango_secret_key not set — add it to config.toml [secrets]")
-	}
-	return c.Secrets.NangoSecretKey, nil
-}
-
-// FindConnection looks up a connection by service+label.
-func (c *Config) FindConnection(service, label string) *Connection {
-	for i := range c.Connections {
-		if c.Connections[i].Service == service && c.Connections[i].Label == label {
-			return &c.Connections[i]
-		}
-	}
-	return nil
-}
-
-// AddConnection adds or replaces a connection.
-func (c *Config) AddConnection(conn Connection) {
-	for i := range c.Connections {
-		if c.Connections[i].Service == conn.Service && c.Connections[i].Label == conn.Label {
-			c.Connections[i] = conn
-			return
-		}
-	}
-	c.Connections = append(c.Connections, conn)
+func generateKey() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
 }
