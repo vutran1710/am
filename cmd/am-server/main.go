@@ -164,6 +164,16 @@ func (s *server) handleList(w http.ResponseWriter, r *http.Request) {
 		source := silo.Source(src)
 		q.Source = &source
 	}
+	if since := r.URL.Query().Get("since"); since != "" {
+		if t, err := time.Parse(time.RFC3339, since); err == nil {
+			q.Since = &t
+		}
+	}
+	if until := r.URL.Query().Get("until"); until != "" {
+		if t, err := time.Parse(time.RFC3339, until); err == nil {
+			q.Until = &t
+		}
+	}
 	if search := r.URL.Query().Get("q"); search != "" {
 		q.Search = search
 	}
