@@ -42,11 +42,47 @@ Browser (Chrome)                        Desktop
 Headless HTTP service. Receives raw messages, stores them, serves queries.
 
 ```
-POST /ingest              Accept messages (API key auth)
-GET  /api/messages        List/search messages
-GET  /api/messages/{id}   Get single message
-GET  /api/stats           Message counts by source
-GET  /healthz             Health check
+POST /ingest                        Accept messages (API key auth)
+POST /webhook/chrome-lite-mcp       Accept chrome-lite-mcp job results
+GET  /api/messages                  List/search messages
+GET  /api/messages/{id}             Get single message
+GET  /api/stats                     Message counts by source
+GET  /healthz                       Health check
+```
+
+#### Webhook endpoint
+
+`POST /webhook/chrome-lite-mcp` accepts payloads from chrome-lite-mcp background jobs:
+
+```json
+{
+  "source": "gmail",
+  "tool": "get_unread",
+  "data": {
+    "type": "json",
+    "data": [
+      {"sender": "Google", "subject": "Security alert", "content": "A new sign-in..."},
+      {"sender": "GitHub", "subject": "OAuth app added", "content": "A third-party app..."}
+    ],
+    "metadata": {"count": 2}
+  },
+  "timestamp": "2026-04-05T08:40:00Z"
+}
+```
+
+For JSON array data: expands each item into a separate message with sender/subject/preview extracted.
+For single objects or non-JSON types: stores as one message with raw data preserved.
+
+Usage with chrome-lite-mcp:
+
+```
+create_job("gmail", {
+  tool: "get_unread",
+  type: "interval",
+  ms: 300000,
+  webhook: "http://localhost:8090/webhook/chrome-lite-mcp",
+  webhookHeaders: '{"X-API-Key": "your-key"}'
+})
 ```
 
 ```bash
