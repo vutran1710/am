@@ -48,6 +48,7 @@ func main() {
 
 	// Authenticated
 	mux.HandleFunc("POST /ingest", s.auth(s.handleIngest))
+	mux.HandleFunc("POST /webhook/chrome-lite-mcp", s.auth(s.handleChromeLiteMCPWebhook))
 	mux.HandleFunc("GET /api/messages", s.auth(s.handleList))
 	mux.HandleFunc("GET /api/messages/{id}", s.auth(s.handleGet))
 	mux.HandleFunc("GET /api/stats", s.auth(s.handleStats))
@@ -231,4 +232,133 @@ func (s *server) handleStats(w http.ResponseWriter, r *http.Request) {
 		"total":   total,
 		"sources": sources,
 	})
+}
+
+// handleChromeLiteMCPWebhook accepts webhook payloads from chrome-lite-mcp background jobs.
+// POST /webhook/chrome-lite-mcp
+// Body: { "source": "gmail", "tool": "get_unread", "data": { "type": "json", "data": [...], "metadata": {...} }, "timestamp": "..." }
+func (s *server) handleChromeLiteMCPWebhook(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Source    string          `json:"source"`
+		Tool      string          `json:"tool"`
+		Data      json.RawMessage `json:"data"`
+		Timestamp string          `json:"timestamp"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"invalid json: %s"}`, err), http.StatusBadRequest)
+		return
+	}
+
+	// Parse the typed result envelope
+	var envelope struct {
+		Type     string          `json:"type"`
+		Data     json.RawMessage `json:"data"`
+		Metadata json.RawMessage `json:"metadata"`
+	}
+	if err := json.Unmarshal(payload.Data, &envelope); err != nil {
+		// Not a typed envelope — store the raw payload as a single message
+		now := time.Now()
+		msg := silo.Message{
+			ID:         fmt.Sprintf("webhook:%s:%s:%d", payload.Source, payload.Tool, now.UnixNano()),
+			Source:     silo.Source(payload.Source),
+			Subject:    payload.Tool,
+			Raw:        payload.Data,
+			CapturedAt: now,
+			SourceTS:   now,
+		}
+		if err := s.store.Put(r.Context(), msg); err != nil {
+			http.Error(w, `{"error":"store failed"}`, http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]int{"ingested": 1})
+		return
+	}
+
+	// For JSON type with array data, try to expand into individual messages
+	if envelope.Type == "json" {
+		var items []json.RawMessage
+		if err := json.Unmarshal(envelope.Data, &items); err == nil && len(items) > 0 {
+			now := time.Now()
+			var msgs []silo.Message
+			for i, item := range items {
+				// Try to extract sender/subject/preview from each item
+				var fields struct {
+					Sender  string `json:"sender"`
+					Email   string `json:"email"`
+					Subject string `json:"subject"`
+					Content string `json:"content"`
+					Snippet string `json:"snippet"`
+					Date    string `json:"date"`
+				}
+				json.Unmarshal(item, &fields)
+
+				preview := fields.Content
+				if preview == "" {
+					preview = fields.Snippet
+				}
+				if len(preview) > 200 {
+					preview = preview[:200]
+				}
+
+				msgs = append(msgs, silo.Message{
+					ID:         fmt.Sprintf("webhook:%s:%s:%d:%d", payload.Source, payload.Tool, now.UnixNano(), i),
+					Source:     silo.Source(payload.Source),
+					Sender:     fields.Sender,
+					Subject:    fields.Subject,
+					Preview:    preview,
+					Raw:        item,
+					CapturedAt: now,
+					SourceTS:   now,
+				})
+			}
+
+			if err := s.store.Put(r.Context(), msgs...); err != nil {
+				http.Error(w, `{"error":"store failed"}`, http.StatusInternalServerError)
+				return
+			}
+			s.logger.Info("webhook ingested", "source", payload.Source, "tool", payload.Tool, "count", len(msgs))
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]int{"ingested": len(msgs)})
+			return
+		}
+
+		// Single object — store as one message
+		now := time.Now()
+		msg := silo.Message{
+			ID:         fmt.Sprintf("webhook:%s:%s:%d", payload.Source, payload.Tool, now.UnixNano()),
+			Source:     silo.Source(payload.Source),
+			Subject:    payload.Tool,
+			Raw:        envelope.Data,
+			CapturedAt: now,
+			SourceTS:   now,
+		}
+		if err := s.store.Put(r.Context(), msg); err != nil {
+			http.Error(w, `{"error":"store failed"}`, http.StatusInternalServerError)
+			return
+		}
+		s.logger.Info("webhook ingested", "source", payload.Source, "tool", payload.Tool, "count", 1)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]int{"ingested": 1})
+		return
+	}
+
+	// Non-JSON type — store as single message with raw data
+	now := time.Now()
+	msg := silo.Message{
+		ID:         fmt.Sprintf("webhook:%s:%s:%d", payload.Source, payload.Tool, now.UnixNano()),
+		Source:     silo.Source(payload.Source),
+		Subject:    payload.Tool,
+		Raw:        payload.Data,
+		CapturedAt: now,
+		SourceTS:   now,
+	}
+	if err := s.store.Put(r.Context(), msg); err != nil {
+		http.Error(w, `{"error":"store failed"}`, http.StatusInternalServerError)
+		return
+	}
+	s.logger.Info("webhook ingested", "source", payload.Source, "tool", payload.Tool, "count", 1)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int{"ingested": 1})
 }
